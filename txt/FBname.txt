@@ -1,0 +1,6 @@
+<img src="img/fbname.png">
+<div class="form-group">
+    <label>FBName In Your System</label>
+    <input  type="text" id="input-name" placeholder="Dev1.Res1.Application1.FB1" class="form-control">
+</div>
+<p class="text-danger" style="display:none">FB Name must not be null!</p>

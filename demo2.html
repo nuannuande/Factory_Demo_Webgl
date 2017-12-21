@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<!--bootstrap-->
+		<link rel="stylesheet" type="text/css" href="css/jquery-confirm.css" />
+		<link rel="stylesheet" href="css/bootstrap.min.css">
+		<script src="js/jquery.min.js"></script>
+		<script src="js/bootstrap.min.js"></script>
+		<script src="js/vue.min.js"></script>
+		<script type="text/javascript" src="js/jquery-confirm.js"></script>
+
+		<!--websocket-->
+		<script src="js/reconnecting-websocket.min.js"></script>
+		<!--three js-->
+		<script type="text/javascript" src="js/three.min.js"></script>
+		<script type="text/javascript" src="js/physi.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/ColladaLoader.js"></script>
+		<script src="js/TDSLoader.js"></script>
+		<script src="js/CSS3DRenderer.js"></script>
+		<style>
+			#display{
+				position: absolute;
+				background-color: rgba(0, 127, 127, 0.411765);
+				top: 0;
+				right: 0;
+				width: 300px;
+				height: 300px;
+				box-shadow: 0px 0px 12px rgba(0,255,255,0.5);
+				border: 1px solid rgba(127,255,255,0.25);
+				text-align: center;
+				cursor: default;
+			}
+			#display .zjrow{
+				margin: 5px 2px;
+				font-weight: bold;
+				color: rgba(255,255,255,0.75);
+				text-shadow: 0 0 10px rgba(0,255,255,0.95);
+				z-index: 20;
+			}
+			.light {
+			float: right;
+             width: 20px;
+             height: 20px;
+            
+             -moz-border-radius: 50px;
+             -webkit-border-radius: 50px;
+              border-radius: 50px;
+             }
+             .lightoff{
+             	 background: rgba(255,255,255,0.75);
+             }
+             .lighton{
+             	background: rgba(127,255,0,0.75);
+             }
+		
+		</style>
+	</head>
+
+	<body>
+		<div id="container" style="width:100%"></div>
+		<div id="display">
+			<!--<div class="zjrow">
+				<span>Set Websocket Url</span>
+				<button class=" btn btn-info" onclick="showWsDig()">WsUrl</button>
+			</div>
+			<div class="zjrow">		
+			<span>Set FBName</span>
+		    <button class=" btn btn-info" onclick="showFN()">FBName</button>
+			</div>-->
+			<div class="zjrow">		
+			<span>Input WebSockUrl And FBName</span>
+		    <button class=" btn btn-info" onclick="showWsDig()">INPUT</button>
+			</div>
+			<div class="zjrow">		
+			<span>Show HMI Interfaces</span>
+		    <button class=" btn btn-info" onclick="showHMI()">HMI</button>
+			</div>
+			<div class="zjrow">
+				<span>Converyer1 Motor</span>
+			
+				<div  v-bind:class="['light',c1m ? 'lighton':'lightoff']"></div>
+			</div>
+			<div class="zjrow">
+				<span>Converyer2 Motor</span>
+				<div  v-bind:class="['light',c2m ? 'lighton':'lightoff']"></div>
+			</div>
+			<div class="zjrow">
+				<span>Turntable Converyer Motor</span>
+				<div  v-bind:class="['light',ttm1 ? 'lighton':'lightoff']"></div>
+			</div>
+			<div class="zjrow">
+				<span>Turntable Motor Forward </span>
+				<div  v-bind:class="['light',ttm2==1 ? 'lighton':'lightoff']"></div>
+			</div>
+			<div class="zjrow">
+				<span>Turntable Motor Backward </span>
+				<div  v-bind:class="['light',ttm2==-1 ? 'lighton':'lightoff']"></div>
+			</div>
+		</div>
+		
+		<script>
+			
+			var view=new Vue({
+  el: '#display',
+  data: {
+   c1m:0,
+   c2m:0,
+   ttm1:0,
+   ttm2:0
+  }
+});
+			var scene, cscene, camera, renderer, crenderer;
+			var ground_material, ground;
+			var container = document.getElementById('container');
+			var cwidth = window.innerWidth,
+				cheight = window.innerHeight;
+			var startpoint = new THREE.Vector3(-30, 14, -9);
+			Physijs.scripts.worker = 'js/physijs_worker.js';
+			Physijs.scripts.ammo = 'ammo.js';
+			var sgeo = new THREE.BoxGeometry(1, 1, 1);
+			var ttray;
+			var converyor1, converyor2;
+			var sl1, sl2, sl3;
+			var sl1ray, sl2ray, sl3ray;
+			var c1ray, c2ray;
+			var turntable1;
+			var stoper;
+			var hammer1, hammer2, hammer3;
+			var h1ray, h2ray, h3ray;
+			var c1s, c2s = 0; //converery1,2 sensor  
+			var h1obj = null,
+				h2obj = null,
+				h3obj = null; //hammer color sensor
+
+			var h1m = h2m = h3m = 0; //hammer motor input
+			var c1motor = 0,
+				c2motor = 0, //c1motor1: true,converyor1 start ,false: converyor1 stop input
+				ttmotor1 = 0,
+				ttmotor2 = 0; //ttmotor1 :convery motor,ttmotor2 rotation motor input
+			var ttstate = 0,
+				ttobjecton = 0; //0:upload state ,1: download state 
+			var ttup = 0,
+				ttdl = 0;
+			var ttcon;
+			var objlist = [];
+			var point = new THREE.Object3D();
+            var hc1,hc2,hc3;
+			init();
+			animate();
+			sensorData();
+
+			function init() {
+				initScene();
+				initCamera();
+				initRender();
+				initControls();
+			}
+
+			function initScene() {
+				cscene = new THREE.Scene();
+				var sbutton=document.createElement('button');
+			    sbutton.className="btn btn-primary";
+			    sbutton.innerText="Add Box";
+			    sbutton.addEventListener('click',()=>{
+			    	createBox();
+			    })
+				var start=new THREE.CSS3DSprite(sbutton);
+			    start.scale.set(0.1,0.1,0.1);
+			    start.position.set(-30,16,-9);
+				cscene.add(start);
+				
+//				var FbButton=document.createElement('button');
+//				FbButton.className="btn btn-info";
+//			    FbButton.innerText="FBName";
+//			    var FBB=new THREE.CSS3DSprite(FbButton);
+//			    FBB.scale.set(0.1,0.1,0.1);
+//			    FBB.position.set(0,10,-30);
+//			    cscene.add(FBB);
+			    
+				scene = new Physijs.Scene;
+				scene.setGravity(new THREE.Vector3(0, -30, 0));
+				//scene.background = new THREE.Color( 0xcce0ff );
+				//scene.fog = new THREE.Fog( 0xcce0ff, 500, 10000 );
+				var tloader = new THREE.TextureLoader();
+				//ground
+				ground_material = Physijs.createMaterial(
+					new THREE.MeshLambertMaterial({
+						map: tloader.load('img/rocks.jpg')
+					}),
+					.8, // high friction
+					.4 // low restitution
+				);
+				ground = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(100, 1, 100),
+					ground_material,
+					0 // mass
+				);
+				ground_material.map.wrapS = ground_material.map.wrapT = THREE.RepeatWrapping;
+				ground_material.map.repeat.set(10, 10);
+				ground.name = "ground";
+				ground.receiveShadow = true;
+				scene.add(ground);
+
+				var converyormaterial = Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						transparent: true,
+						opacity: 0
+					}),
+					0.6, 0.2
+				);
+				var sensormaterial=Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						color: 0xf2f2f2,
+						transparent: true,
+						opacity: 0.7
+					}),
+					0.6, 0.2
+				);
+				var turntablematerial = Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						color: 0xf2f2f2,
+						transparent: true,
+						opacity: 0.1
+					}),
+					0.5, 0.3
+				);
+				//convertor1 and side
+				converyor1 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(4, 1, 20),
+					converyormaterial,
+					0 // mass
+				);
+			
+			    
+				var c1raybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial,
+					0
+				)
+				c1raybox.position.set(startpoint.x - 3, 11, startpoint.z); //startpoint.x-2,11,startpoint.z
+				scene.add(c1raybox);
+
+				c1ray = new THREE.Raycaster(c1raybox.position.clone(), new THREE.Vector3(1, 0, 0));
+
+							new THREE.ColladaLoader().load( './model/converyer1.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+									//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.4,0.45);
+							     target.position.set(-28.5,8,12);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/converyer1.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.25,0.5);
+							     target.position.set(-12,8,10.2);
+							     target.rotation.set(-Math.PI/2,0,Math.PI/2);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/convery.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.25,0.5);
+							     target.position.set(3,8,10.2);
+							     target.rotation.set(-Math.PI/2,0,Math.PI/2);
+								 scene.add(target);
+							} );
+						
+							
+				//			new THREE.ColladaLoader().load( './model/box.dae', function ( collada ) {
+				//				var target=collada.scene;
+				//			     target.scale.set(1,1,1);
+				//			     target.position.set(-28.5,8,12);
+				//				 scene.add(target);
+				//			} );
+
+				var c1side1 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(0.1, 1, 20),
+					converyormaterial,
+					0
+				)
+				var c1side2 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(0.1, 1, 20),
+					converyormaterial,
+					0
+				)
+				converyor1.name = "converyor1";
+				converyor1.position.set(-30, 10, 0);
+				c1side1.position.set(-28, 11.1, 0);
+				c1side2.position.set(-32, 11.1, 0)
+				scene.add(converyor1);
+				scene.add(c1side2);
+				scene.add(c1side1);
+				//turntable and side and constraint
+				turntable1 = new Physijs.CylinderMesh(
+					new THREE.CylinderGeometry(2, 2, 1, 32),
+					turntablematerial,
+					10
+				);
+
+				var tts1 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(0.1, 1, 2),
+					turntablematerial,
+					1
+				)
+				var tts2 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(0.1, 1, 2),
+					turntablematerial,
+					1
+				)
+
+				turntable1.position.set(-30.2, 10, 12.2);
+				new THREE.ColladaLoader().load( './model/turntable.dae', function ( collada ) {
+				                var target=collada.scene;
+								target.traverse(function(obj){
+                                // obj.castShadow=true;
+								})
+							     target.scale.set(0.07,0.07,0.07);
+							     
+							    target.rotation.set(-Math.PI/2,0,Math.PI/2);
+							    target.position.set(6.5,0,-1);
+								 turntable1.add(target);
+							} );
+				tts1.position.set(-28, 11.1, 12.2);
+				tts2.position.set(-32, 11.1, 12.2);
+				turntable1.name = "tt";
+				scene.add(turntable1);
+				scene.add(tts1);
+				scene.add(tts2);
+				var ttraybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial,
+					0
+				)
+				ttraybox.position.set(turntable1.position.x, turntable1.position.y - 1, turntable1.position.z + 0.2);
+				scene.add(ttraybox);
+				ttray = new THREE.Raycaster(ttraybox.position.clone(), new THREE.Vector3(0, 1, 0));
+				//constraint turntable
+				var turnbase = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(1, 1, 1),
+					converyormaterial,
+					0
+				);
+				turnbase.position.set(-30.5, 1, 12.5);
+				scene.add(turnbase);
+
+				ttcon = new Physijs.DOFConstraint(
+					turntable1, turnbase, turntable1.position.clone()
+				);
+				var ttcon1 = new Physijs.DOFConstraint(tts1, turntable1, tts1.position.clone());
+				var ttcon2 = new Physijs.DOFConstraint(tts2, turntable1, tts2.position.clone());
+
+				scene.addConstraint(ttcon);
+				scene.addConstraint(ttcon1);
+				scene.addConstraint(ttcon2);
+				ttcon.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				ttcon.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				ttcon1.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				ttcon1.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				ttcon2.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				ttcon2.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				converyor2 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(30, 1, 4),
+					converyormaterial,
+					0 // mass
+				);
+
+				converyor2.name = "converyor2";
+				converyor2.position.set(-13, 10, 12);
+				var c2raybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial,
+					0
+				);
+				c2raybox.position.set(-27, 11, 15);
+				scene.add(c2raybox);
+				c2ray = new THREE.Raycaster(c2raybox.position.clone(), new THREE.Vector3(0, 0, -1));
+
+				var c2s1 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(8, 1, 0.1),
+					converyormaterial, 0
+				)
+				c2s1.position.set(-23, 11, 10);
+				var c2s2 = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(8, 1, 0.1),
+					converyormaterial, 0
+				)
+				c2s2.position.set(-23, 11, 14);
+				scene.add(c2s1);
+				scene.add(c2s2);
+				scene.add(converyor2);
+				var slidegeo = new THREE.BoxGeometry(3, 1, 10);
+				var slidesidegeo = new THREE.BoxGeometry(0.1, 1, 10);
+				var sldmaterial1 = Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						color: 0xff0000,
+						transparent: true,
+						opacity: 0.7
+					}),
+					0.2, 0.2
+				);
+				var sldmaterial2 = Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						color: 0xffff00,
+						transparent: true,
+						opacity: 0.7
+					}),
+					0.2, 0.2
+				);
+				var sldmaterial3 = Physijs.createMaterial(
+					new THREE.MeshBasicMaterial({
+						color: 0x0000ff,
+						transparent: true,
+						opacity: 0.7
+					}),
+					0.2, 0.2
+				);
+				
+
+				sl1 = new Physijs.BoxMesh(
+					slidegeo,
+					sldmaterial1,
+					0
+				);
+
+				var sl1raybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial, 0
+				);
+				sl1raybox.position.set(-14, 11, 9);
+				scene.add(sl1raybox);
+				sl1ray = new THREE.Raycaster(sl1raybox.position.clone(), new THREE.Vector3(1, 0, 0));
+				var sl1s1 = new Physijs.BoxMesh(
+					slidesidegeo,
+					sldmaterial1,
+					0
+				);
+
+				sl1.position.set(-12, 9, 5);
+				sl1.rotation.set(-0.3, 0, 0);
+				scene.add(sl1);
+				var sledge = new THREE.BoxGeometry(3, 2, 1);
+				var sl1s = new Physijs.BoxMesh(
+					sledge,
+					sldmaterial1,
+					0
+				);
+				sl1s.name = 0xff0000;
+				sl1s.position.set(sl1.position.x, sl1.position.y, sl1.position.z - 5);
+
+				sl2 = new Physijs.BoxMesh(
+					slidegeo,
+					sldmaterial2,
+					0
+				);
+
+				sl2.position.set(-6, 9, 5);
+				sl2.rotation.set(-0.3, 0, 0);
+				scene.add(sl2);
+
+				var sl2raybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial, 0
+				);
+				sl2raybox.position.set(-8, 11, 9);
+				scene.add(sl2raybox);
+				sl2ray = new THREE.Raycaster(sl2raybox.position.clone(), new THREE.Vector3(1, 0, 0));
+
+				sl3 = new Physijs.BoxMesh(
+					slidegeo,
+					sldmaterial3,
+					0
+				);
+				sl3.position.set(0, 9, 5);
+				sl3.rotation.set(-0.3, 0, 0);
+				scene.add(sl3);
+
+				var sl2s = new Physijs.BoxMesh(
+					sledge,
+					sldmaterial2,
+					0
+				);
+				sl2s.name = 0xffff00;
+				sl2s.position.set(sl2.position.x, sl2.position.y, sl2.position.z - 5);
+
+				var sl3s = new Physijs.BoxMesh(
+					sledge,
+					sldmaterial3,
+					0
+				);
+				sl3s.name = 0x0000ff;
+				sl3s.position.set(sl3.position.x, sl3.position.y, sl3.position.z - 5);
+				var sl3raybox = new Physijs.BoxMesh(
+					sgeo,
+					sensormaterial, 0
+				);
+				scene.add(sl1s);
+				scene.add(sl2s);
+				scene.add(sl3s);
+				sl3raybox.position.set(-2, 11, 9);
+				scene.add(sl3raybox);
+				sl3ray = new THREE.Raycaster(sl3raybox.position.clone(), new THREE.Vector3(1, 0, 0));
+				scene.addEventListener('update', () => {
+					scene.simulate(undefined, 1);
+				});
+
+				//light
+				light = new THREE.DirectionalLight(0xFFFFFF);
+				light.position.set(20, 40, -15);
+				light.target.position.copy(scene.position);
+				light.castShadow = true;
+				light.shadowCameraLeft = -60;
+				light.shadowCameraTop = -60;
+				light.shadowCameraRight = 60;
+				light.shadowCameraBottom = 60;
+				light.shadowCameraNear = 20;
+				light.shadowCameraFar = 200;
+				light.shadowBias = -.0001;
+				light.shadowMapWidth = light.shadowMapHeight = 2048;
+				light.shadowDarkness = .7;
+				scene.add(light);
+
+				//selector
+				hammer1 = new Physijs.BoxMesh(new THREE.BoxGeometry(2, 1, 4),
+					converyormaterial,
+					1
+				);
+
+				hammer1.name = "h1";
+				hammer1.position.set(-12, 11.2, 15);
+				h1ray = new THREE.Raycaster(hammer1.position.clone().add(new THREE.Vector3(1, 0, 0)), new THREE.Vector3(0, 0, -1));
+				scene.add(hammer1);
+
+				var h1con = new Physijs.DOFConstraint(hammer1, ground, hammer1.position.clone());
+				scene.addConstraint(h1con);
+				h1con.setLinearLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h1con.setLinearUpperLimit({
+					x: 0,
+					y: 0,
+					z: 5
+				});
+				h1con.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h1con.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+
+				hammer2 = new Physijs.BoxMesh(new THREE.BoxGeometry(2, 1, 4),
+					converyormaterial,
+					1
+				);
+				hammer2.position.set(-6, 11.2, 15);
+				h2ray = new THREE.Raycaster(hammer2.position.clone().add(new THREE.Vector3(1, 0, 0)), new THREE.Vector3(0,0,-1));
+				
+				hammer2.name = "h2";
+				scene.add(hammer2);
+				var h2con = new Physijs.DOFConstraint(hammer2, ground, hammer2.position.clone());
+				scene.addConstraint(h2con);
+				h2con.setLinearLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h2con.setLinearUpperLimit({
+					x: 0,
+					y: 0,
+					z: 5
+				});
+				h2con.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h2con.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+
+				hammer3 = new Physijs.BoxMesh(new THREE.BoxGeometry(2, 1, 4),
+					converyormaterial,
+					1
+				);
+				hammer3.position.set(0, 11.2, 15);
+				h3ray = new THREE.Raycaster(hammer3.position.clone().add(new THREE.Vector3(1, 0, 0)), new THREE.Vector3(0, 0, -1));
+				
+				hammer3.name = "h3";
+				scene.add(hammer3);
+				var h3con = new Physijs.DOFConstraint(hammer3, ground, hammer3.position.clone());
+				scene.addConstraint(h3con);
+				h3con.setLinearLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h3con.setLinearUpperLimit({
+					x: 0,
+					y: 0,
+					z: 5
+				});
+				h3con.setAngularLowerLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+				h3con.setAngularUpperLimit({
+					x: 0,
+					y: 0,
+					z: 0
+				});
+
+	new THREE.ColladaLoader().load( './model/slide.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.18,0.4);
+							     target.position.set(-10.5,7,11);
+							     target.rotation.set(-Math.PI/2,0,0);
+								 scene.add(target);
+							} );
+								new THREE.ColladaLoader().load( './model/slide.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.18,0.4);
+							     target.position.set(-4.5,7,11);
+							     target.rotation.set(-Math.PI/2,0,0);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/slide.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.scale.set(0.1,0.18,0.4);
+							     target.position.set(1.5,7,11);
+							     target.rotation.set(-Math.PI/2,0,0);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/cylinder.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.position.set(-12,11.5,14.7);
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/cylinder.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+
+								//obj.castShadow=true;
+								})
+							     target.position.set(-6,11.5,14.7);
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+								 scene.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/cylinder.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								});
+							     target.position.set(0,11.5,14.7);
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+								 scene.add(target);
+							} );
+							
+							new THREE.ColladaLoader().load( './model/chit.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+							     target.position.set(0,0.5,1);
+								 hammer1.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/chit.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+							     target.position.set(0,0.5,1);
+								 hammer2.add(target);
+							} );
+							new THREE.ColladaLoader().load( './model/chit.dae', function ( collada ) {
+								var target=collada.scene;
+								target.traverse(function(obj){
+								//obj.castShadow=true;
+								})
+							     target.rotation.set(-Math.PI/2,0,-Math.PI/2);
+							   
+							     target.position.set(0,0.5,1);
+								 hammer3.add(target);
+							} );
+				scene.simulate();
+
+				window.addEventListener('resize', Onresize);
+
+			}
+
+			function Onresize(event) {
+				cwidth = window.innerWidth, cheight = window.innerHeight;
+				camera.aspect = cwidth / cheight;
+
+				camera.updateProjectionMatrix();
+				controls.update();
+				renderer.setSize(cwidth, cheight);
+				crenderer.setSize(cwidth, cheight);
+			}
+
+			function initCamera() {
+				camera = new THREE.PerspectiveCamera(35, cwidth / cheight, 1, 1000);
+				camera.position.set(60, 50, 60);
+				camera.lookAt(scene.position);
+				scene.add(camera);
+			}
+
+			function initRender() {
+				renderer = new THREE.WebGLRenderer();
+				renderer.setSize(cwidth, cheight);
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMapSoft = true;
+				container.appendChild(renderer.domElement);
+				crenderer = new THREE.CSS3DRenderer();
+				crenderer.setSize(cwidth, cheight);
+				crenderer.domElement.style.position = 'absolute';
+				crenderer.domElement.style.top = 0;
+				container.appendChild(crenderer.domElement);
+			}
+
+			function initControls() {
+				controls = new THREE.OrbitControls(camera);
+
+				controls.addEventListener('change', render); // remove when using animation loop
+				// enable animation loop when using damping or autorotation
+				
+				controls.enableZoom = true;
+				controls.maxPolarAngle = Math.PI / 2.5;
+                controls.maxDistance=200;
+				controls.enableDamping = true;
+				controls.dampingFactor = 0.25;
+			}
+
+			function render() {
+				renderer.render(scene, camera);
+				crenderer.render(cscene, camera);
+			}
+
+			function animate() {
+				requestAnimationFrame(animate);
+				controls.update();
+			    render();
+				//sensor
+				sensor();
+				//turntable
+			//	turntable();
+				//hammer
+				hammer();
+				//convery
+				objlist.forEach(function(value, index) {
+					moveObj(value);
+				})
+			}
+
+			function sensor() {
+				// TODO 将通过撞击判断物体所在位置改为通过射线判断
+				if(turntable1.rotation.y > 1.3) ttdl = 1;
+				else if(turntable1.rotation.y < 0.1) ttup = 1;
+				else {
+					ttup = 0;
+					ttdl = 0;
+				}
+
+				var c1 = c1ray.intersectObjects(objlist);
+				if(c1[0]) {
+					c1s = 1;
+					c1[0].object.loc = 1;
+				} else c1s = 0;
+
+				var c2 = c2ray.intersectObjects(objlist);
+				if(c2[0]) {
+					c2s = 1;
+					c2[0].object.loc = 2;
+				} else c2s = 0;
+				var ttinsert = ttray.intersectObjects(objlist);
+				if(ttinsert[0]) {
+					ttinsert[0].object.loc = "tt";
+
+					ttobjecton = 1;
+		             //zjzj test
+
+				}
+				var h1insert = h1ray.intersectObjects(objlist);
+				if(h1insert[0]) {
+					
+					h1obj = h1insert[0].object._color;
+				
+				} else {
+					h1obj = null;
+				}
+				var h2insert = h2ray.intersectObjects(objlist);
+				if(h2insert[0]) {
+					h2obj = h2insert[0].object._color;
+				
+				} else h2obj = null;
+				var h3insert = h3ray.intersectObjects(objlist);
+				if(h3insert[0]) {
+					h3obj = h3insert[0].object._color;
+					
+				} else h3obj = null;
+				var sl1insert = sl1ray.intersectObjects(objlist);
+				if(sl1insert[0]) {
+					sl1insert[0].object.loc = null;
+				}
+				var sl2insert = sl2ray.intersectObjects(objlist);
+				if(sl2insert[0]) {
+					sl2insert[0].object.loc = null;
+				}
+				var sl3insert = sl3ray.intersectObjects(objlist);
+				if(sl3insert[0]) {
+					sl3insert[0].object.loc = null;
+				}
+
+			}
+
+			function turntable() {
+				//	console.log(turntable1.rotation);
+				switch(ttmotor2) {
+					case 1:
+						ttcon.configureAngularMotor(1, 0, 1.4, 1, 1500);
+						ttcon.enableAngularMotor(1);
+						break;
+					case -1:
+						ttcon.configureAngularMotor(1, 0, 1.4, -1, 1500);
+						ttcon.enableAngularMotor(1);
+						break;
+					case 0:
+						ttcon.disableAngularMotor(1);
+						break;
+				}
+			}
+
+			function hammer() {
+				if(h1m) {
+					hammer1.setLinearVelocity(new THREE.Vector3(0, 0, -5));}
+				else {hammer1.setLinearVelocity(new THREE.Vector3(0, 0, 5))};
+				if(h2m) hammer2.setLinearVelocity(new THREE.Vector3(0, 0, -5));
+				else hammer2.setLinearVelocity(new THREE.Vector3(0, 0, 5));
+				if(h3m) hammer3.setLinearVelocity(new THREE.Vector3(0, 0, -5));
+				else hammer3.setLinearVelocity(new THREE.Vector3(0, 0, 5));
+			}
+
+			function moveObj(obj) {
+				if(obj.position.z > 15.1 || obj.position.x > 15) {
+					obj.loc = null;
+				}
+				switch(obj.loc) {
+					case 1:
+						if(c1motor) obj.setLinearVelocity(new THREE.Vector3(0, 0, 10));
+						else obj.setLinearVelocity(new THREE.Vector3(0, 0, 0));
+						break;
+					case 2:
+						if(c2motor) obj.setLinearVelocity(new THREE.Vector3(10, 0, 0));
+						else obj.setLinearVelocity(new THREE.Vector3(0, 0, 0));
+						break;
+					case "tt":
+						if(ttmotor1 && ttup) obj.setLinearVelocity(new THREE.Vector3(0, 0, 10));
+						else if(ttmotor1 && ttdl) obj.setLinearVelocity(new THREE.Vector3(10, 0, 0));
+						else obj.setLinearVelocity(new THREE.Vector3(0, 0, 0));
+				}
+
+			}
+
+			function createBox() {
+				var box, material;
+				var color = Math.random() * 3;
+				if(color < 1) {
+					color = 0xff0000 //RED
+				} else if(color > 2) {
+					color = 0xffff00 //YELLOW
+				} else {
+					color = 0x0000ff //BLUE
+				}
+				material = Physijs.createMaterial(
+					new THREE.MeshLambertMaterial({
+						color: color
+					}),
+					.6, // medium friction
+					.3 // low restitution
+				);
+				//				material.map.wrapS 	= material.map.wrapT = THREE.RepeatWrapping;
+				//				material.map.repeat.set( .5, .5 );
+				box = new Physijs.BoxMesh(
+					new THREE.BoxGeometry(2, 2, 2),
+					material,
+					1
+				);
+				box._color = color;
+				var grounddog;
+				var congrdog;
+				box.addEventListener('collision', function(collided_with, linearVelocity, angularVelocity) {
+					var scope=box;
+					//console.log("coll::" + collided_with.name);
+					
+					if(collided_with.name == "ground") {
+						
+					clearTimeout(grounddog);
+					grounddog=setTimeout(()=>{
+							$.alert({
+							title:"Warining ",
+							content: 'Your Product  is On The Ground'
+						});
+						},1000);
+					}
+					if(collided_with.name==scope._color){
+						clearTimeout(congrdog);
+						setTimeout(()=>{
+						$.alert({
+							title:"Congratulations ",
+							content: 'You Pass the demo2'
+						});	
+						},1000);
+						
+					}
+				});
+
+				box.position.set(startpoint.x, startpoint.y, startpoint.z);
+				//box.castShadow=true;
+				scene.add(box);
+				objlist.push(box);
+			}
+
+
+			function sensorData() {
+				setInterval(() => {
+					if(ws) {
+						ws.send( FBName+".c1 "+c1s+","+FBName+".c2 "+c2s+","+
+							FBName +  ".ontt "  + ttobjecton + "," +FBName+".ttup "+ttup+","+FBName+".ttdl "+ttdl+","+
+							FBName + ".color1 " + h1obj + "," + FBName + ".color2 " + h2obj+"," + FBName + ".color3 " + h3obj
+						);
+						ws.send(FBName + ".sensor");
+					}
+				}, 300);
+			}
+
+			function Wsc() {
+
+			}
+
+			function t2(num) {
+				ttmotor2 = num;
+				turntable();
+				view._data.ttm2=num;
+			}
+
+			function t1(num) {
+				ttmotor1 = num;
+				view._data.ttm1=num;
+			}
+
+			function c1(num) {
+				c1motor = num;
+				view._data.c1m=num;
+			}
+
+			function c2(num) {
+				c2motor = num;
+				view._data.c2m=num;
+			}
+
+			function h1(num) {
+				h1m = num;
+				
+			}
+
+			function h2(num) {
+				h2m = num;
+			}
+              function h3(num) {
+				h3m = num;
+			}
+			var wsurl = "localhost:8080";
+			var ws;
+			var FBName = "Dev1.Res1.Application1.FB1";
+            
+			function wsconnect() {
+				ws=null;
+				ws=new WebSocket("ws://" + wsurl);
+				ws.onmessage = function(event) {
+					//console.log(event.data);
+					var res = event.data.split(',');
+					for(var i = 0; i < res.length; i++) {
+						var dts = res[i].split(" ");
+						if(dts[0]==FBName+".c1m"){
+							view._data.c1m=c1motor=Number(dts[1]);
+						}
+						else if(dts[0]==FBName+".c2m"){
+							c1motor=Number(dts[1]);view._data.c1m=Number(dts[1]);
+						}
+						else if(dts[0]==FBName+".ttm1"){
+							ttmotor1=Number(dts[1]);
+							view._data.ttm1=Number(dts[1]);
+						}
+						else if(dts[0]==FBName+".ttm2"){
+							ttmotor2=Number(dts[1]);
+							view._data.ttm2=Number(dts[1]);
+							turntable();
+						}
+						else if(dts[0]==FBName+".h1c"){
+							h1m=Number(dts[1]);
+						
+						}
+						else if(dts[0]==FBName+".h2c"){
+							h2m=Number(dts[1]);
+						
+						}
+						else if(dts[0]==FBName+".h3c"){
+							h3m=Number(dts[1]);
+						
+						}
+					}
+				}
+				ws.onerror = function(event) {
+				
+				
+				}
+				ws.onopen = function(event) {
+					ws._opened = true;
+				}
+				ws.onclose=function(event){
+					
+					
+				}
+			}
+
+			function sendevent(evt) {
+				if(ws) {
+					ws.send(FBName + "." + evt);
+				}
+			}
+
+			function senddata(dataname, dataval) {
+				if(ws) {
+					ws.send(FBName + "." + dataname + " " + dataval);
+				}
+			}
+			
+			function showWsDig() {
+				controls.enabled=false;
+				$.confirm({
+					title:'Enter WebSocket Url',
+					content: 'url:txt/ws.txt',
+					confirmButton: 'connect',
+					confirm: function() {
+						var wsin = this.$b.find('input#input-name').val();
+						var errorText = this.$b.find('.text-danger');
+						if(wsin == '') {
+				errorText.show();
+				return false;
+			} else {
+				wsurl = wsin;
+				wsconnect();
+				setTimeout(() => {
+					if(ws._opened) {
+			           showFN();
+					} else {
+						ws=null;
+						showWsDig();
+					}
+				}, 1000);
+			}
+			},
+			cancelButton: false
+			});
+
+			};
+			//showWsDig();
+
+			function showHMI(){
+				controls.enabled=false;
+				$.confirm({
+                    title: 'HMI Interfaces',
+                    content: 'url:txt/table.html',
+                    animation: 'top',
+                    columnClass: 'col-md-6 col-md-offset-3',
+                    closeAnimation: 'bottom',
+                    confirm:function(){
+                    	controls.enabled=true;
+                    },
+                    cancelButton:false
+                    
+                });
+			}
+			function showFN() {
+				controls.enabled=false;
+				$.confirm({
+					title: 'Enter FBname',
+					content: 'url:txt/FBname.txt',
+					confirmButton: 'okay',
+					confirm: function() {
+						var wsin = this.$b.find('input#input-name').val();
+						var errorText = this.$b.find('.text-danger');
+						if(wsin == "") {
+							errorText.show();
+							return false;
+						} else {
+							FBName = wsin;
+							controls.enabled=true;
+						}
+					},
+					cancelButton: false
+
+				})
+			}
+		</script>
+	</body>
+
+</html>

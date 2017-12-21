@@ -1,0 +1,99 @@
+<style>
+	.event{
+		background: #76EE00;
+	}
+	</style>
+<table class="table table-bordered table-condensed table-striped">
+    <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+    </tr>
+    <tr class="event">
+        <td>motor</td>
+        <td >Event Input</td>
+        <td>Chang Motor State Event ,including Follow Data Input</td>
+    </tr>
+    <tr>
+        <td>c1m</td>
+        <td>Data Input</td>
+        <td>Converyer1 Motor ,1:on ,0:off</td>
+    </tr>
+    <tr>
+        <td>c2m</td>
+        <td>Data Input</td>
+        <td>Converyer2 Motor ,1:on ,0:off</td>
+    </tr>
+    <tr>
+        <td>ttm1</td>
+        <td>Data Input</td>
+        <td>Turntable Converyer Motor,1:on,0:off</td>
+    </tr>
+    <tr>
+        <td>ttm2</td>
+        <td>Data Input</td>
+        <td>Turntable Rotate Motor,1:Forward ,0:stop:,-1:Backward</td>
+    </tr>
+    <tr>
+        <td>h1c</td>
+        <td>Data Input</td>
+        <td>Hammer1 Cylinder,1:Forward,0:Backward</td>
+    </tr>
+    <tr>
+       <td>h2c</td>
+        <td>Data Input</td>
+        <td>Hammer2 Cylinder,1:Forward,0:Backward</td>
+    </tr>
+    <tr>
+        <td>h3c</td>
+        <td>Data Input</td>
+        <td>Hammer3 Cylinder,1:Forward,0:Backward</td>
+    </tr>
+    
+    <tr class="event">
+        <td>sensor</td>
+        <td>Event Output</td>
+        <td>Refresh Sensor Per 300ms,Include Following Sener Data</td>
+    </tr>
+    
+    <tr>
+        <td>c1</td>
+        <td>Data Output</td>
+        <td>Converyer1 Has Object On ,1:has 0:has not</td>
+    </tr>
+    <tr>
+        <td>c2</td>
+        <td>Data Output</td>
+        <td>Converyer2 Has Object On ,1:has 0:has not</td>
+    </tr>
+    <tr>
+        <td>ontt</td>
+        <td>Data Output</td>
+        <td>TurnTable Has Object On ,1:has 0:has not</td>
+    </tr>
+    <tr>
+        <td>ttup</td>
+        <td>Data Output</td>
+        <td>TurnTable is Upload State ,1:is ,0:not</td>
+    </tr>
+    <tr>
+        <td>ttdl</td>
+        <td>Data Output</td>
+        <td>TurnTable is Download State ,1:is ,0:not</td>
+    </tr>
+    <tr>
+        <td>color1</td>
+        <td>Data Output</td>
+        <td>What Color The Object At Hammer1 Cylinder ,return RGB Number,etc: 0xff0000() red</td>
+    </tr>
+    <tr>
+        <td>color2</td>
+        <td>Data Output</td>
+        <td>What Color The Object At Hammer2 Cylinder ,return RGB Number,etc: 0xff0000() red</td>
+    </tr>
+    <tr>
+        <td>color3</td>
+        <td>Data Output</td>
+        <td>What Color The Object At Hammer3 Cylinder ,return RGB Number,etc: 0xff0000() red</td>
+    </tr>
+</table>

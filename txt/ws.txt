@@ -1,0 +1,7 @@
+<img src="img/system1.png">
+
+<div class="form-group">
+    <label>WebSocket Server</label>
+    <input autofocus type="text" id="input-name" placeholder="localhost:8080" class="form-control">
+</div>
+<p class="text-danger" style="display:none">WebSocket Url must not be null!</p>

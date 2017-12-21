@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="UTF-8">
+		<title></title>
+		<link rel="stylesheet" type="text/css" href="css/jquery-confirm.css" />
+		<link rel="stylesheet" href="css/bootstrap.min.css">
+		<script src="js/jquery.min.js"></script>
+		<script src="js/bootstrap.min.js"></script>
+		<script src="js/vue.min.js"></script>
+		<script type="text/javascript" src="js/jquery-confirm.js"></script>
+
+		<!--websocket-->
+		<script src="js/reconnecting-websocket.min.js"></script>
+		<!--three js-->
+		<!--<script type="text/javascript" src="js/three.min.js"></script>
+		<script type="text/javascript" src="js/physi.js"></script>-->
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/ColladaLoader.js"></script>
+		<script src="js/TDSLoader.js"></script>
+		<script src="js/CSS3DRenderer.js"></script>
+	</head>
+	<body>
+		<div id="container"></div>
+		<script>
+			var scene, cscene, camera, renderer, crenderer;
+			var container = document.getElementById('container');
+			var cwidth = window.innerWidth,
+				cheight = window.innerHeight;
+				
+				init();
+				animate();
+				function init(){
+					initScene();
+					initCamera();
+					initRenderer();
+					initControls();
+				}
+				
+				function initScene(){
+					scene=new THREE.Scene();
+					new THREE.ColladaLoader().load('/model/crossreads.dae',(coll)=>{
+						
+						scene.add(coll.scene);
+					})
+				}
+				
+				
+				
+				function animate(){
+					requestAnimationFrame(animate)
+				}
+		</script>
+	</body>
+</html>

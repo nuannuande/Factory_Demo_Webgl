@@ -1,0 +1,33 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FBType Name="data2event" Comment="Service Interface Function Block Type">
+  <Identification Standard="61499-2" Classification="" ApplicationDomain="" Function="" Type="" Description="" />
+  <VersionInfo Organization="YY Automation" Version="0.1" Author="WD" Date="2017-03-03" Remarks="" />
+  <InterfaceList>
+    <EventInputs>
+      <Event Name="IN" Type="EVENT" Comment="Service Initialization">
+        <With Var="num1" />
+        <With Var="num2" />
+      </Event>
+    </EventInputs>
+    <EventOutputs>
+      <Event Name="PUP" Type="EVENT" Comment="Initialization Confirm" />
+      <Event Name="PDW" Type="EVENT" Comment="" />
+      <Event Name="EON" Type="EVENT" Comment="" />
+      <Event Name="EOFF" Type="EVENT" Comment="" />
+    </EventOutputs>
+    <InputVars>
+      <VarDeclaration Name="num1" Type="INT" ArraySize="" InitialValue="" Comment="Event Input Qualifier" />
+      <VarDeclaration Name="num2" Type="INT" ArraySize="" InitialValue="" Comment="" />
+    </InputVars>
+    <OutputVars />
+  </InterfaceList>
+  <CompilerInfo />
+  <Service>
+    <InternalVars>
+      <VarDeclaration Name="state" Type="BOOL" ArraySize="" InitialValue="" Comment="" />
+    </InternalVars>
+    <Algorithm Name="exchange" Comment="">
+      <Other Language="CPP" Text="if( num1==num2){&#xD;&#xA; fbptr-&gt;emitEO(&quot;EON&quot;);&#xD;&#xA; if(!state){&#xD;&#xA;  fbptr-&gt;emitEO(&quot;PUP&quot;);&#xD;&#xA;  state=true;&#xD;&#xA; }&#xD;&#xA;}&#xD;&#xA;else{&#xD;&#xA;if(state){&#xD;&#xA; fbptr-&gt;emitEO(&quot;PDW&quot;);&#xD;&#xA;}&#xD;&#xA; fbptr-&gt;emitEO(&quot;EOFF&quot;);&#xD;&#xA;}&#xD;&#xA;" />
+    </Algorithm>
+  </Service>
+</FBType>

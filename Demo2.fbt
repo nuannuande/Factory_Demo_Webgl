@@ -1,0 +1,120 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FBType Name="Demo2" Comment="HMI Panel Type">
+  <CompilerInfo />
+  <Identification Standard="61499-2" Classification="" ApplicationDomain="" Function="" Type="" Description="" />
+  <VersionInfo Organization="YY Automation" Version="0.1" Author="WD" Date="2014-08-21" Remarks="" />
+  <InterfaceList>
+    <EventInputs>
+      <Event Name="motor" Type="EVENT" Comment="Service Initialization">
+        <With Var="c1m" />
+        <With Var="c2m" />
+        <With Var="ttm1" />
+        <With Var="ttm2" />
+        <With Var="h1c" />
+        <With Var="h2c" />
+        <With Var="h3c" />
+      </Event>
+    </EventInputs>
+    <EventOutputs>
+      <Event Name="sensor" Type="EVENT" Comment="Initialization Confirm">
+        <With Var="c1" />
+        <With Var="c2" />
+        <With Var="ontt" />
+        <With Var="ttup" />
+        <With Var="ttdl" />
+        <With Var="color1" />
+        <With Var="color2" />
+        <With Var="color3" />
+      </Event>
+    </EventOutputs>
+    <InputVars>
+      <VarDeclaration Name="c1m" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="c2m" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="ttm1" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="ttm2" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="h1c" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="h2c" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="h3c" Type="INT" ArraySize="" InitialValue="" Comment="" />
+    </InputVars>
+    <OutputVars>
+      <VarDeclaration Name="c1" Type="INT" ArraySize="" InitialValue="" Comment="Event Output Qualifier" />
+      <VarDeclaration Name="c2" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="ontt" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="ttup" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="ttdl" Type="INT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="color1" Type="DINT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="color2" Type="DINT" ArraySize="" InitialValue="" Comment="" />
+      <VarDeclaration Name="color3" Type="DINT" ArraySize="" InitialValue="" Comment="" />
+    </OutputVars>
+  </InterfaceList>
+  <Panel Language="HTML" Width="1200" Height="1000" Template="">
+    <PanelHead><![CDATA[]]></PanelHead>
+    <PanelCSS><![CDATA[
+		]]></PanelCSS>
+    <PanelJS><![CDATA[ <%screenid%>App.factory('<%id%>WSService', function() {
+		      var service = {};
+		      service.connect = function() {
+			      if(service.ws) { return; }
+		          var ws = new WebSocket("ws://<%runtimeaddr%>/");
+		 	      ws.onopen = function() {
+					service.callback("Succeeded to open a connection");
+					overlay("none");
+					console.log("Connection success");
+				  };
+			      ws.onclose = function() {
+					service.ws = null;
+					overlay("table");
+					setTimeout(service.connect(), 500);
+					console.log("Trying to reconnect");
+				  };
+				  ws.onerror = function() {service.callback("Failed to open a connection");};
+			      ws.onmessage = function(message) {service.callback(message.data);};
+			      service.ws = ws;
+		        };
+		      service.send = function(message) {service.ws.send(message);}
+		      service.subscribe = function(callback) {service.callback = callback;}
+		      return service;
+		   });
+		   <%screenid%>App.controller("<%id%>Controller", function ($scope,$interval,<%id%>WSService) {
+			   <%id%>WSService.subscribe(function(message) {
+				  var res = message.split(",");
+				  for (var index = 0; index < res.length; index++) {
+					  var vars = res[index].split(" ");
+					                      if (vars[0] == "<%FBPath%>c1m")
+                        $scope.data["<%FBPath%>c1m"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>c2m")
+                        $scope.data["<%FBPath%>c2m"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>ttm1")
+                        $scope.data["<%FBPath%>ttm1"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>ttm2")
+                        $scope.data["<%FBPath%>ttm2"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>h1c")
+                        $scope.data["<%FBPath%>h1c"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>h2c")
+                        $scope.data["<%FBPath%>h2c"] = vars[1];
+                   else if (vars[0] == "<%FBPath%>h3c")
+                        $scope.data["<%FBPath%>h3c"] = vars[1];
+
+				    }
+				   $scope.$apply();
+			   });
+			   $scope.connect = function() {<%id%>WSService.connect();}
+			   $scope.send = function(data) {<%id%>WSService.send(data);}
+			   $scope.data = new Array();
+			   $scope.data = new Array();$scope.data["<%FBPath%>c1m"] = 0;
+$scope.data["<%FBPath%>c2m"] = 0;
+$scope.data["<%FBPath%>ttm1"] = 0;
+$scope.data["<%FBPath%>ttm2"] = 0;
+$scope.data["<%FBPath%>h1c"] = 0;
+$scope.data["<%FBPath%>h2c"] = 0;
+$scope.data["<%FBPath%>h3c"] = 0;
+
+		   });
+	   ]]></PanelJS>
+    <PanelHTML><![CDATA[	<div ng-controller="<%id%>Controller" style="position: absolute; top: <%top%>px; left: <%left%>px; width: <%width%>px; height: <%height%>px; background: <%background%>;">
+	            <div data-ng-init="connect()"></div>
+                   
+			</div>]]></PanelHTML>
+  </Panel>
+  <Mappings />
+</FBType>
